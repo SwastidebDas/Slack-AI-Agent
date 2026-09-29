@@ -46,6 +46,69 @@ class SlackAIAgent{
             {
                 log.error('Error processing team_join:',err.message);
             }
+        });
+
+        this.slack.event('member_joined_channel',async ({event})=>{
+            try{
+                if(event.channel_type==='C'){
+                    log.info(`member ${event.user} joined channel ${event.channel}`);
+                    const userInfo= this.getUserInfo(even.user);
+                    await this.analyzeAndPostMember(userInfo);
+                }
+            }
+            catch(err)
+            {
+                log.error('Error Processing member_joined_channel:',err.message);
+            }
+        });
+
+        this.slack.error(async (error)=> log.error('Slack error',error.message));
+    }
+
+    setupExpress()
+    {
+        this.app.use(express.json());
+        this.app.get('/health',(req,res)=>{
+            res.json({status : healthy, timestamp: new Date().toISOString()});  
         })
+        if(process.env.NODE_ENV==='development')
+            {
+                this.app.post('/test/analyzi-member',async(req,res)=>{
+                    try{
+
+                        const {memberInfo}= req.body;
+                        if(!memberInfo) return res.status(400).json({error :'member info is required.'});
+                        const analysis = this.analyzeAndPostMember(memberInfo);
+                        res.json({success:true, analysis,timestamp: new Date().toISOString()});
+                    }catch(error)
+                    {
+                        log.error('Test Analysis error: ',error.message);
+                        res.status(500).json({error:'Analysis Failed',message:error.message});
+                    }
+                })
+            }
+            this.app.use((err,req,res,next)=>{
+                log.error('ExpressError',err.message);
+                res.status(500).json({error:'Internal Server Error'});
+            }) 
+    }
+
+    async getUserInfo(userId) {
+        const result = await this.webClient.users.info({ user: userId });
+        const user = result.user;
+
+        return {
+            id: user.id,
+            name: user.real_name || user.name,
+            username: user.name,
+            email: user.profile?.email,
+            title: user.profile?.title,
+            timezone: user.tz,
+            profile: {
+                firstName: user.profile?.first_name,
+                lastName: user.profile?.last_name,
+                statusText: user.profile?.status_text
+            }
+        };
     }
 }
