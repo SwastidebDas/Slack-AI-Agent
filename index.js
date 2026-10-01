@@ -111,4 +111,29 @@ class SlackAIAgent{
             }
         };
     }
+
+    async analyzeAndPostMember(memberInfo)
+    {
+        let analysisId=null;
+        try{
+             log.info(`processing member: ${memberInfo.name}`);
+             const researchData= await this.doBasicResearch(memberInfo);
+             const analysis= await this.analyzeWithAI(memberInfo,researchData);
+             log.info(`Saving analysis to DB for ${memberInfo.name}`);
+             analysisId= await saveMemberAnalysis(memberInfo,analysis,researchData);
+             await this.postAnalysisToChannel(memberInfo,analysis,researchData);
+
+             if(analysisID)
+                await markAsSentToSlack(analysisID);
+        }
+        catch(err)
+        {
+            log.error(`error processing ${memberInfo.name}:`,error.message);
+            if(analysisId!=null)
+            {
+                log.info(`Analysis ${analysisId} saved to Database but not sent to slack due to error`);
+            }
+            throw error;
+        }
+    }
 }
